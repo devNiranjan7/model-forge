@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Editors and operating system
+.DS_Store
+.vscode/
+
+# Uploaded datasets and generated artifacts
+uploads/
+artifacts/
+*.joblib
+*.pkl
+EOF
