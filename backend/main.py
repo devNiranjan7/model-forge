@@ -1,6 +1,7 @@
 import csv
 import io
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,47 @@ def validate_csv(filename: str, content: bytes):
         ) from None
 
 
+def create_histograms(numeric_df: pd.DataFrame) -> dict:
+    """Create histogram bins for each column"""
+    histograms = {}
+    for column in numeric_df.columns:
+        values = numeric_df[column].dropna()
+        if values.empty:
+            histograms[column] = []
+            continue
+
+        counts, bin_edges = np.histogram(values, bins=10)
+        histograms[column] = [
+            {
+                "bin_start": float(bin_edges[i]),
+                "bin_end": float(bin_edges[i + 1]),
+                "count": int(counts[i]),
+            }
+            for i in range(len(counts))
+        ]
+
+    return histograms
+
+
+def create_categorical_distributions(
+    df: pd.DataFrame, columns: list[str], top_n: int = 10
+) -> dict:
+    """Return the most frequent values for each categorical column."""
+    distributions = {}
+
+    for column in columns:
+        counts = df[column].dropna().astype(str).value_counts().head(top_n)
+        distributions[column] = [
+            {
+                "category": str(category),
+                "count": int(count),
+            }
+            for category, count in counts.items()
+        ]
+
+    return distributions
+
+
 @app.post("/api/datasets/upload")
 async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
     content = await file.read(MAX_FILE_SIZE + 1)
@@ -91,10 +133,14 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
     column_types = df.dtypes.astype(str).to_dict()
 
     numeric_df = df.select_dtypes(include="number")
+    histograms = create_histograms(numeric_df)
     numeric_columns = numeric_df.columns.tolist()
     non_numeric_columns = [
         column for column in df.columns if column not in numeric_columns
     ]
+    categorical_distributions = create_categorical_distributions(
+        df, non_numeric_columns
+    )
     constant_columns = [column for column in df.columns if df[column].nunique() <= 1]
     numeric_text_columns = [
         column
@@ -222,4 +268,6 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
         "possible_id_columns": possible_id_columns,
         "dataset_summary": dataset_summary,
         "dataset_warnings": dataset_warnings,
+        "histograms": histograms,
+        "categorical_distributions": categorical_distributions,
     }
