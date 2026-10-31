@@ -1,5 +1,8 @@
+import pandas as pd
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from main import app
+from main import app, train_baseline_model
 
 client = TestClient(app)
 
@@ -323,3 +326,135 @@ def test_upload_returns_memory_usage_and_file_size():
 
     assert data["size_bytes"] == len(csv_content)
     assert data["memory_usage_bytes"] > 0
+
+
+def test_train_baseline_classification():
+    df = pd.DataFrame(
+        {
+            "age": range(20, 40),
+            "salary": range(30000, 50000, 1000),
+            "purchased": [0, 1] * 10,
+        }
+    )
+
+    result = train_baseline_model(
+        df=df,
+        target_column="purchased",
+        task_type="classification",
+    )
+
+    assert result["task_type"] == "classification"
+    assert result["model"] == "Logistic Regression"
+    assert result["target_column"] == "purchased"
+    assert result["train_rows"] + result["test_rows"] == 20
+    assert "accuracy" in result["metrics"]
+    assert "f1_weighted" in result["metrics"]
+
+
+def test_train_baseline_regression():
+    df = pd.DataFrame(
+        {
+            "size": range(1, 21),
+            "bedrooms": [2, 3, 4, 2, 3] * 4,
+            "price": [100, 150, 200, 120, 170] * 4,
+        }
+    )
+
+    result = train_baseline_model(
+        df=df,
+        target_column="price",
+        task_type="regression",
+    )
+
+    assert result["task_type"] == "regression"
+    assert result["model"] == "Linear Regression"
+    assert result["target_column"] == "price"
+    assert "mae" in result["metrics"]
+    assert "rmse" in result["metrics"]
+    assert "r2" in result["metrics"]
+
+
+def test_train_baseline_rejects_missing_target():
+    df = pd.DataFrame(
+        {
+            "feature": range(10),
+            "label": [0, 1] * 5,
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        train_baseline_model(
+            df=df,
+            target_column="missing",
+            task_type="classification",
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_train_baseline_rejects_invalid_task():
+    df = pd.DataFrame(
+        {
+            "feature": range(10),
+            "label": [0, 1] * 5,
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        train_baseline_model(
+            df=df,
+            target_column="label",
+            task_type="clustering",
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_train_endpoint_classification():
+    csv_content = "age,salary,purchased\n" + "".join(
+        f"{age},{30000 + (age - 20) * 1000},{age % 2}\n" for age in range(20, 40)
+    )
+
+    response = client.post(
+        "/api/models/train",
+        files={
+            "file": (
+                "customers.csv",
+                csv_content.encode(),
+                "text/csv",
+            )
+        },
+        data={
+            "target_column": "purchased",
+            "task_type": "classification",
+            "test_size": "0.2",
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["model"] == "Logistic Regression"
+    assert result["target_column"] == "purchased"
+    assert "accuracy" in result["metrics"]
+
+
+def test_train_endpoint_rejects_missing_target():
+    csv_content = "age,purchased\n" + "".join(f"{age},{age % 2}\n" for age in range(20))
+
+    response = client.post(
+        "/api/models/train",
+        files={
+            "file": (
+                "customers.csv",
+                csv_content.encode(),
+                "text/csv",
+            )
+        },
+        data={
+            "target_column": "missing",
+            "task_type": "classification",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "does not exist" in response.json()["detail"]
