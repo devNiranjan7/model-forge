@@ -229,7 +229,7 @@ def train_baseline_model(
     if categorical_features:
         categorical_pipeline = Pipeline(
             [
-                ("imputer", SimpleImputer(strategy="mode")),
+                ("imputer", SimpleImputer(strategy="most_frequent")),
                 ("encoder", OneHotEncoder(handle_unknown="ignore")),
             ]
         )

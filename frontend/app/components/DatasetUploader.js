@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-export default function DatasetUploader({ onUploadSuccess }) {
+export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
     const inputRef = useRef(null);
     const [file, setFile] = useState(null);
     const [error, setError] = useState("");
@@ -16,18 +16,21 @@ export default function DatasetUploader({ onUploadSuccess }) {
         setError("");
         if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
             setFile(null);
+            onFileSelected?.(null);
             setError("Please choose a CSV file.");
             return;
         }
 
         if (selectedFile.size === 0) {
             setFile(null);
+            onFileSelected?.(null);
             setError("This file is empty. Please choose another CSV file.");
             return;
         }
 
         if (selectedFile.size > MAX_FILE_SIZE) {
             setFile(null);
+            onFileSelected?.(null);
             setError(
                 "The file exceeds the 10 MB limit. Please choose a smaller file.",
             );
@@ -35,6 +38,7 @@ export default function DatasetUploader({ onUploadSuccess }) {
         }
 
         setFile(selectedFile);
+        onFileSelected?.(selectedFile);
     }
 
     function handleFileChange(event) {
@@ -54,6 +58,7 @@ export default function DatasetUploader({ onUploadSuccess }) {
         }
         if (event.dataTransfer.files.length > 1) {
             setFile(null);
+            onFileSelected?.(null);
             setError("Please select one CSV file at a time.");
             return;
         }
@@ -62,7 +67,9 @@ export default function DatasetUploader({ onUploadSuccess }) {
 
     function clearFile() {
         setFile(null);
+        onFileSelected?.(null);
         setError("");
+        setUploadResult(null);
     }
 
     function formatFileSize(bytes) {
