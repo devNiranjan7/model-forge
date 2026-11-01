@@ -1,8 +1,10 @@
 import csv
 import io
+import os
 
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.compose import ColumnTransformer
@@ -21,14 +23,19 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+load_dotenv()
+
+frontend_origins = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -233,7 +240,7 @@ def train_baseline_model(
                 ("encoder", OneHotEncoder(handle_unknown="ignore")),
             ]
         )
-        transformers.append(("catrgorical", categorical_pipeline, categorical_features))
+        transformers.append(("categorical", categorical_pipeline, categorical_features))
 
     preprocessor = ColumnTransformer(transformers=transformers)
 

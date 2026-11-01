@@ -15,6 +15,13 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+import {
+    Show,
+    SignInButton,
+    SignUpButton,
+    SignOutButton,
+    UserButton,
+} from "@clerk/nextjs";
 
 const navigation = [
     { icon: "⌂", label: "Overview", active: true, href: "#overview" },
@@ -205,7 +212,7 @@ export default function Home() {
             formData.append("task_type", taskType);
             formData.append("test_size", testSize);
             const response = await fetch(
-                "http://127.0.0.1:8000/api/models/train",
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/models/train`,
                 { method: "POST", body: formData },
             );
             const data = await response.json();
@@ -254,7 +261,7 @@ export default function Home() {
         <div className="min-h-screen md:h-screen md:overflow-hidden md:flex">
             <Sidebar />
             <main className="min-w-0 flex-1 md:overflow-y-auto px-5 py-7 sm:px-8 lg:px-10">
-                <header className="flex flex-wrap items-center justify-center gap-4">
+                <header className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <p className="text-sm text-(--muted)">
                             Workspace / Overview
@@ -266,9 +273,40 @@ export default function Home() {
                             Get your data ready for machine learning.
                         </p>
                     </div>
-                    <span className="rounded-full border border-(--border) bg-white px-4 py-2 text-xs font-medium text-(--primary)">
-                        ⏺ Workspace ready
-                    </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Show when="signed-out">
+                            <SignInButton mode="modal">
+                                <button
+                                    type="button"
+                                    className="rounded-xl border border-(--border) bg-white px-4 py-2 text-sm font-medium text-(--primary) transition hover:bg-background"
+                                >
+                                    Sign In
+                                </button>
+                            </SignInButton>
+                            <SignUpButton mode="modal">
+                                <button
+                                    type="button"
+                                    className="rounded-xl bg-(--forest) px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                                >
+                                    Sign Up
+                                </button>
+                            </SignUpButton>
+                        </Show>
+                        <Show when="signed-in">
+                            <span className="rounded-full border border-(--border) bg-white px-4 py-2 text-xs font-medium text-(--primary)">
+                                Workspace ready
+                            </span>
+                            <SignOutButton>
+                                <button
+                                    type="button"
+                                    className="rounded-xl border border-(--border) bg-white px-4 py-2 text-sm font-medium text-(--primary) transition hover:bg-background"
+                                >
+                                    Log Out
+                                </button>
+                            </SignOutButton>
+                            <UserButton />
+                        </Show>
+                    </div>
                 </header>
                 <section id="overview" className="mt-9">
                     <div className="mb-4">

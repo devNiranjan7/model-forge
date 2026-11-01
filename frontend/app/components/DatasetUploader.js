@@ -89,7 +89,7 @@ export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
             const formData = new FormData();
             formData.append("file", file);
             const response = await fetch(
-                "http://127.0.0.1:8000/api/datasets/upload",
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/upload`,
                 { method: "POST", body: formData },
             );
             const data = await response.json();
