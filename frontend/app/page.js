@@ -21,6 +21,7 @@ import {
     SignUpButton,
     SignOutButton,
     UserButton,
+    useAuth,
 } from "@clerk/nextjs";
 
 const navigation = [
@@ -103,6 +104,7 @@ function OverviewCard({ card }) {
 }
 
 export default function Home() {
+    const { getToken, isLoaded, isSignedIn } = useAuth();
     const [dataset, setDataset] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
     const [trainingResult, setTrainingResult] = useState(null);
@@ -113,6 +115,12 @@ export default function Home() {
     const [testSize, setTestSize] = useState("0.2");
     const [isTraining, setIsTraining] = useState(false);
     const [trainingError, setTrainingError] = useState("");
+    const [savedDatasets, setSavedDatasets] = useState([]);
+    const [isLoadingDatasets, setIsLoadingDatasets] = useState(false);
+    const [datasetsError, setDatasetsError] = useState("");
+    const [loadingDatasetId, setLoadingDatasetId] = useState(null);
+    const [activeDatasetId, setActiveDatasetId] = useState(null);
+    const [deletingDatasetId, setDeletingDatasetId] = useState(null);
     const analysisRef = useRef(null);
     const missingChartData = dataset
         ? Object.entries(dataset.missing_by_column)
@@ -187,19 +195,54 @@ export default function Home() {
 
     function handleUploadSuccess(data) {
         setDataset(data);
+        setActiveDatasetId(data.dataset_id);
         setTrainingResult(null);
+        setTrainingError("");
+        setTargetColumn("");
+        fetchSavedDatasets();
+        analysisRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+        });
+    }
 
-        requestAnimationFrame(() => {
+    async function handleLoadSavedDataset(datasetId) {
+        setLoadingDatasetId(datasetId);
+        setDatasetsError("");
+        try {
+            const token = await getToken();
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/${datasetId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                },
+            );
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "Unable to load saved dataset.");
+            }
+            setDataset(data);
+            setActiveDatasetId(data.dataset_id);
+            setSelectedFile(null);
+            setTrainingResult(null);
+            setTrainingError("");
+            setTargetColumn("");
             analysisRef.current?.scrollIntoView({
                 behavior: "smooth",
                 block: "start",
             });
-        });
+        } catch (error) {
+            setDatasetsError(error.message);
+        } finally {
+            setLoadingDatasetId(null);
+        }
     }
 
     async function handleTrainModel(event) {
         event.preventDefault();
-        if (!selectedFile || !targetColumn || isTraining) {
+        if (!activeDatasetId || !targetColumn || isTraining) {
             return;
         }
         setIsTraining(true);
@@ -207,13 +250,25 @@ export default function Home() {
         setTrainingResult(null);
         try {
             const formData = new FormData();
-            formData.append("file", selectedFile);
+            formData.append("dataset_id", activeDatasetId);
             formData.append("target_column", targetColumn);
             formData.append("task_type", taskType);
             formData.append("test_size", testSize);
+            const token = await getToken();
+            if (!token) {
+                throw new Error(
+                    "Authentication required. Please sign in again.",
+                );
+            }
             const response = await fetch(
                 `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/models/train`,
-                { method: "POST", body: formData },
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                },
             );
             const data = await response.json();
             if (!response.ok) {
@@ -230,6 +285,67 @@ export default function Home() {
             );
         } finally {
             setIsTraining(false);
+        }
+    }
+
+    async function fetchSavedDatasets() {
+        setIsLoadingDatasets(true);
+        setDatasetsError("");
+        try {
+            const token = await getToken();
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                },
+            );
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(
+                    data.detail || "Unable to load saved datasets.",
+                );
+            }
+            setSavedDatasets(Array.isArray(data) ? data : data.datasets || []);
+        } catch (error) {
+            setDatasetsError(error.message);
+        } finally {
+            setIsLoadingDatasets(false);
+        }
+    }
+
+    async function handleDeleteDataset(datasetId) {
+        setDeletingDatasetId(datasetId);
+        setDatasetsError("");
+        try {
+            const token = await getToken();
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/${datasetId}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                },
+            );
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || "Unable to delete dataset.");
+            }
+            if (activeDatasetId === datasetId) {
+                setDataset(null);
+                setActiveDatasetId(null);
+                setSelectedFile(null);
+                setTrainingResult(null);
+                setTrainingError("");
+                setTargetColumn("");
+            }
+            await fetchSavedDatasets();
+        } catch (error) {
+            setDatasetsError(error.message);
+        } finally {
+            setDeletingDatasetId(null);
         }
     }
 
@@ -256,6 +372,15 @@ export default function Home() {
             setSelectedCategory("");
         }
     }, [dataset]);
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        if (!isSignedIn) {
+            setSavedDatasets([]);
+            return;
+        }
+        fetchSavedDatasets();
+    }, [isLoaded, isSignedIn, getToken]);
 
     return (
         <div className="min-h-screen md:h-screen md:overflow-hidden md:flex">
@@ -341,6 +466,90 @@ export default function Home() {
                                 setTrainingResult(null);
                             }}
                         />
+                    </div>
+                </section>
+                <section id="saved-datasets" className="mt-8">
+                    <div className="mb-4">
+                        <h2 className="text-lg font-semibold">
+                            Your Saved Datasets
+                        </h2>
+                        <p className="mt-1 text-sm text-(--muted)">
+                            Datasets you&apos;ve uploaded previously.
+                        </p>
+                    </div>
+                    <div className="rounded-2xl border border-(--border) bg-white p-5">
+                        {isLoadingDatasets ? (
+                            <p className="text-sm text-(--muted)">
+                                Loading your datasets...
+                            </p>
+                        ) : datasetsError ? (
+                            <p role="alert" className="text-sm text-red-600">
+                                {datasetsError}
+                            </p>
+                        ) : savedDatasets.length === 0 ? (
+                            <p className="text-sm text-(--muted)">
+                                No saved datasets yet. Upload a CSV file to get
+                                started.
+                            </p>
+                        ) : (
+                            <div className="space-y-3">
+                                {savedDatasets.map((item) => (
+                                    <div
+                                        key={item.dataset_id}
+                                        onClick={() =>
+                                            handleLoadSavedDataset(
+                                                item.dataset_id,
+                                            )
+                                        }
+                                        className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-(--border) p-4 cursor-pointer transition hover:border-blue-400 hover:bg-blue-50/50"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            {loadingDatasetId ===
+                                                item.dataset_id && (
+                                                <p className="text-xs text-blue-600">
+                                                    Loading dataset...
+                                                </p>
+                                            )}
+                                            <p className="truncate text-sm font-semibold">
+                                                {item.filename}
+                                            </p>
+                                            <p className="mt-1 text-xs text-(--muted)">
+                                                {item.rows.toLocaleString()}{" "}
+                                                rows
+                                                {" · "}
+                                                {item.columns} columns
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-xs text-(--muted)">
+                                                {new Date(
+                                                    item.created_at,
+                                                ).toLocaleDateString()}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    handleDeleteDataset(
+                                                        item.dataset_id,
+                                                    );
+                                                }}
+                                                disabled={
+                                                    deletingDatasetId ===
+                                                    item.dataset_id
+                                                }
+                                                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {deletingDatasetId ===
+                                                item.dataset_id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </section>
                 {dataset && (
@@ -751,7 +960,7 @@ export default function Home() {
                         )}
                     </section>
                 )}
-                {dataset && selectedFile && (
+                {dataset && activeDatasetId && (
                     <section
                         id="training"
                         className="mt-8 rounded-2xl border border-(--border) bg-white p-6 sm:p-8"

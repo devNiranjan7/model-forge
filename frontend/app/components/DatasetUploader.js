@@ -1,10 +1,12 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useRef, useState } from "react";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 40 * 1024 * 1024;
 
 export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
+    const { getToken } = useAuth();
     const inputRef = useRef(null);
     const [file, setFile] = useState(null);
     const [error, setError] = useState("");
@@ -32,7 +34,7 @@ export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
             setFile(null);
             onFileSelected?.(null);
             setError(
-                "The file exceeds the 10 MB limit. Please choose a smaller file.",
+                "The file exceeds the 40 MB limit. Please choose a smaller file.",
             );
             return;
         }
@@ -88,9 +90,21 @@ export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
         try {
             const formData = new FormData();
             formData.append("file", file);
+            const token = await getToken();
+            if (!token) {
+                throw new Error(
+                    "Authentication required. Please sign in again.",
+                );
+            }
             const response = await fetch(
                 `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/upload`,
-                { method: "POST", body: formData },
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                },
             );
             const data = await response.json();
             if (!response.ok) {
@@ -142,7 +156,7 @@ export default function DatasetUploader({ onUploadSuccess, onFileSelected }) {
                         : "Choose a CSV dataset or drag and drop it here to get started."}
                 </p>
                 <p className="mt-4 text-xs text-(--muted)">
-                    CSV files · Maximum size 10 MB
+                    CSV files · Maximum size 40 MB
                 </p>
                 <button
                     type="button"

@@ -1,11 +1,20 @@
 import csv
 import io
 import os
+from datetime import UTC, datetime
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
+from auth import require_auth
+from database import (
+    delete_user_dataset,
+    get_user_dataset,
+    get_user_datasets,
+    save_dataset,
+)
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -22,6 +31,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from storage import delete_file, download_file, upload_file
 
 load_dotenv()
 
@@ -41,12 +51,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 40 * 1024 * 1024  # 40 MB
 
 
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api/me")
+async def get_current_user(user_id: str = Depends(require_auth)):
+    return {
+        "authenticated": True,
+        "user_id": user_id,
+    }
 
 
 def validate_csv(filename: str, content: bytes):
@@ -58,7 +76,7 @@ def validate_csv(filename: str, content: bytes):
         raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File size must not exceed 10 MB")
+        raise HTTPException(status_code=413, detail="File size must not exceed 40 MB")
 
     try:
         text = content.decode("utf-8-sig")
@@ -326,19 +344,7 @@ def train_baseline_model(
     }
 
 
-@app.post("/api/datasets/upload")
-async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
-    content = await file.read(MAX_FILE_SIZE + 1)
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail="File size must not exceed 10 MB.",
-        )
-
-    validate_csv(file.filename or "", content)
-
-    df = pd.read_csv(io.BytesIO(content))
-
+def inspect_dataframe(df):
     memory_usage_bytes = int(df.memory_usage(deep=True).sum())
     rows, columns = df.shape
     column_types = df.dtypes.astype(str).to_dict()
@@ -346,13 +352,17 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
     numeric_df = df.select_dtypes(include="number")
     histograms = create_histograms(numeric_df)
     numeric_columns = numeric_df.columns.tolist()
+
     non_numeric_columns = [
         column for column in df.columns if column not in numeric_columns
     ]
+
     categorical_distributions = create_categorical_distributions(
         df, non_numeric_columns
     )
+
     constant_columns = [column for column in df.columns if df[column].nunique() <= 1]
+
     numeric_text_columns = [
         column
         for column in non_numeric_columns
@@ -360,6 +370,7 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
         == df[column].notna().sum()
         and df[column].notna().any()
     ]
+
     mixed_type_columns = [
         column
         for column in df.columns
@@ -370,11 +381,13 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
             < df[column].notna().sum()
         )
     ]
+
     empty_columns = [column for column in df.columns if df[column].isna().all()]
 
     missing_by_column = df.isnull().sum()
     total_missing = int(missing_by_column.sum())
     missing_percentage = ((missing_by_column / len(df)) * 100).round(2)
+
     high_missing_columns = [
         column for column, percentage in missing_percentage.items() if percentage > 50
     ]
@@ -390,7 +403,7 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
 
         numeric_stats = {
             column: {
-                statistic: (float(value) if pd.notna(value) else None)
+                statistic: float(value) if pd.notna(value) else None
                 for statistic, value in statistics.items()
             }
             for column, statistics in numeric_stats.items()
@@ -448,9 +461,6 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
         dataset_warnings.append(f"Column '{column}' contains only missing values.")
 
     return {
-        "message": "CSV file validated successfully.",
-        "filename": file.filename,
-        "size_bytes": len(content),
         "memory_usage_bytes": memory_usage_bytes,
         "rows": rows,
         "columns": columns,
@@ -484,33 +494,172 @@ async def upload_dataset(file: UploadFile = File(...)):  # noqa: B008
     }
 
 
-@app.post("/api/models/train")
-async def train_model(
-    file: UploadFile = File(...),  # noqa: B008
-    target_column: str = Form(...),
-    task_type: str = Form(...),
-    test_size: float = Form(0.2),
+@app.post("/api/datasets/upload")
+async def upload_dataset(
+    file: UploadFile = File(...), user_id: str = Depends(require_auth)  # noqa: B008
 ):
     content = await file.read(MAX_FILE_SIZE + 1)
-
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=413,
-            detail="File size exceeds the 10 MB limit.",
+            detail="File size must not exceed 40 MB.",
         )
 
     validate_csv(file.filename or "", content)
 
+    df = pd.read_csv(io.BytesIO(content))
+
+    inspection = inspect_dataframe(df)
+
+    dataset_id = str(uuid4())
+    storage_key = f"users/{user_id}/dataset/{dataset_id}.csv"
+    created_at = datetime.now(UTC)
+
     try:
-        df = pd.read_csv(io.BytesIO(content))
-    except (ValueError, pd.errors.ParserError, UnicodeDecodeError) as exc:
+        upload_file(content, storage_key)
+    except Exception as error:
         raise HTTPException(
-            status_code=400,
-            detail="Unable to read the uploaded CSV file.",
-        ) from exc
+            status_code=500, detail="Unable to store dataset file."
+        ) from error
+
+    dataset_metadata = {
+        "_id": dataset_id,
+        "user_id": user_id,
+        "filename": file.filename or "dataset.csv",
+        "rows": int(df.shape[0]),
+        "columns": int(df.shape[1]),
+        "file_size": len(content),
+        "storage_key": storage_key,
+        "created_at": created_at,
+    }
+
+    try:
+        save_dataset(dataset_metadata)
+    except Exception as error:
+        try:
+            delete_file(storage_key)
+        except Exception as cleanup_error:  # noqa: BLE001
+            print(f"R2 cleanup failed: {cleanup_error}")
+
+        raise HTTPException(
+            status_code=500, detail="Unable to save dataset information."
+        ) from error
+
+    return {
+        "message": "CSV file validated successfully.",
+        "dataset_id": dataset_id,
+        "created_at": created_at.isoformat(),
+        "storage_key": storage_key,
+        "filename": file.filename,
+        "size_bytes": len(content),
+        **inspection,
+    }
+
+
+@app.get("/api/datasets")
+async def list_datasets(user_id: str = Depends(require_auth)):
+    datasets = get_user_datasets(user_id)
+
+    return {
+        "datasets": [
+            {
+                "dataset_id": dataset["_id"],
+                "filename": dataset["filename"],
+                "rows": dataset["rows"],
+                "columns": dataset["columns"],
+                "file_size": dataset["file_size"],
+                "created_at": (
+                    dataset["created_at"].isoformat()
+                    if dataset.get("created_at")
+                    else None
+                ),
+            }
+            for dataset in datasets
+        ]
+    }
+
+
+@app.get("/api/datasets/{dataset_id}")
+async def get_dataset(dataset_id: str, user_id: str = Depends(require_auth)):
+    dataset = get_user_dataset(dataset_id, user_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+
+    try:
+        content = download_file(dataset["storage_key"])
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve dataset file.",
+        ) from error
+
+    inspection = inspect_dataframe(df)
+
+    return {
+        "dataset_id": dataset["_id"],
+        "filename": dataset["filename"],
+        "size_bytes": dataset["file_size"],
+        "created_at": (
+            dataset["created_at"].isoformat() if dataset.get("created_at") else None
+        ),
+        **inspection,
+    }
+
+
+@app.delete("/api/datasets/{dataset_id}")
+async def delete_dataset(dataset_id: str, user_id: str = Depends(require_auth)):
+    dataset = get_user_dataset(dataset_id, user_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+
+    try:
+        delete_file(dataset["storage_key"])
+    except Exception as error:
+        raise HTTPException(
+            status_code=500, detail="Unable to delete dataset file."
+        ) from error
+
+    result = delete_user_dataset(dataset_id, user_id)
+
+    if result.deleted_count != 1:
+        raise HTTPException(
+            status_code=500, detail="Unable to delete dataset information."
+        )
+
+    return {"message": "Dataset deleted successfully.", "dataset_id": dataset_id}
+
+
+@app.post("/api/models/train")
+async def train_model(
+    dataset_id: str = Form(...),
+    target_column: str = Form(...),
+    task_type: str = Form(...),
+    test_size: float = Form(0.2),
+    user_id: str = Depends(require_auth),
+):
+    dataset = get_user_dataset(dataset_id, user_id)
+
+    if not dataset:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found.",
+        )
+
+    try:
+        content = download_file(dataset["storage_key"])
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve dataset file.",
+        ) from error
 
     result = train_baseline_model(
-        df=df, target_column=target_column, task_type=task_type, test_size=test_size
+        df=df,
+        target_column=target_column,
+        task_type=task_type,
+        test_size=test_size,
     )
 
     return {

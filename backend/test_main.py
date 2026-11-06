@@ -1,10 +1,39 @@
 import pandas as pd
 import pytest
+from auth import require_auth
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from main import app, train_baseline_model
 
 client = TestClient(app)
+
+app.dependency_overrides[require_auth] = lambda: "test-user-id"
+
+
+@pytest.fixture(autouse=True)
+def mock_dataset_storage(monkeypatch):
+    monkeypatch.setattr("main.upload_file", lambda file_data, object_key: None)
+    monkeypatch.setattr("main.save_dataset", lambda dataset: dataset)
+    monkeypatch.setattr("main.delete_file", lambda object_key: None)
+    monkeypatch.setattr(
+        "main.get_user_dataset",
+        lambda dataset_id, user_id: {
+            "_id": dataset_id,
+            "user_id": user_id,
+            "filename": "customers.csv",
+            "storage_key": f"users/{user_id}/dataset/{dataset_id}.csv",
+        },
+    )
+    monkeypatch.setattr(
+        "main.download_file",
+        lambda storage_key: (
+            b"age,salary,purchased\n"
+            + b"".join(
+                f"{age},{30000 + (age - 20) * 1000},{age % 2}\n".encode()
+                for age in range(20, 40)
+            )
+        ),
+    )
 
 
 def test_health_check():
@@ -417,14 +446,8 @@ def test_train_endpoint_classification():
 
     response = client.post(
         "/api/models/train",
-        files={
-            "file": (
-                "customers.csv",
-                csv_content.encode(),
-                "text/csv",
-            )
-        },
         data={
+            "dataset_id": "test-dataset-id",
             "target_column": "purchased",
             "task_type": "classification",
             "test_size": "0.2",
@@ -443,14 +466,8 @@ def test_train_endpoint_rejects_missing_target():
 
     response = client.post(
         "/api/models/train",
-        files={
-            "file": (
-                "customers.csv",
-                csv_content.encode(),
-                "text/csv",
-            )
-        },
         data={
+            "dataset_id": "test-dataset-id",
             "target_column": "missing",
             "task_type": "classification",
         },
