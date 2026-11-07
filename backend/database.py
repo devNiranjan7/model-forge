@@ -16,6 +16,7 @@ client = MongoClient(
     MONGODB_URI,
     serverSelectionTimeoutMS=5000,
     tlsCAFile=certifi.where(),
+    tz_aware=True,
 )
 
 db = client[MONGODB_DATABASE]
@@ -35,8 +36,10 @@ def check_database_connection():
 
 
 datasets_collection = db["datasets"]
+experiments_collection = db["experiments"]
 
 datasets_collection.create_index([("user_id", 1), ("created_at", -1)])
+experiments_collection.create_index([("user_id", 1), ("created_at", -1)])
 
 
 def save_dataset(dataset):
@@ -66,3 +69,22 @@ def get_user_dataset(dataset_id, user_id):
 
 def delete_user_dataset(dataset_id, user_id):
     return datasets_collection.delete_one({"_id": dataset_id, "user_id": user_id})
+
+
+def save_experiment(experiment):
+    experiments_collection.insert_one(experiment)
+    return experiment
+
+
+def get_user_experiments(user_id):
+    return list(
+        experiments_collection.find({"user_id": user_id}).sort("created_at", -1)
+    )
+
+
+def get_user_experiment(experiment_id, user_id):
+    return experiments_collection.find_one({"_id": experiment_id, "user_id": user_id})
+
+
+def delete_user_experiment(experiment_id, user_id):
+    return experiments_collection.delete_one({"_id": experiment_id, "user_id": user_id})

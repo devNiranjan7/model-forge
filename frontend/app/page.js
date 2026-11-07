@@ -1,1181 +1,799 @@
-"use client";
+export const instant = false;
 
-import { useState, useRef, useEffect } from "react";
-import DatasetUploader from "./components/DatasetUploader.js";
+import Image from "next/image";
+import Link from "next/link";
+import { Show } from "@clerk/nextjs";
+import CurrentYear from "./components/CurrentYear";
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from "recharts";
-import {
-    Show,
-    SignInButton,
-    SignUpButton,
-    SignOutButton,
-    UserButton,
-    useAuth,
-} from "@clerk/nextjs";
+    ArrowRight,
+    ArrowUpRight,
+    BarChart3,
+    Check,
+    Database,
+    FileSpreadsheet,
+    FlaskConical,
+    GitCompareArrows,
+    Layers3,
+    Microscope,
+    SlidersHorizontal,
+    Sparkles,
+    Target,
+    Upload,
+    Zap,
+} from "lucide-react";
 
-const navigation = [
-    { icon: "⌂", label: "Overview", active: true, href: "#overview" },
-    { icon: "▤", label: "Dataset Inspector", href: "#inspector" },
-    { icon: "◈", label: "Experiments", href: "#experiments" },
-    { icon: "◇", label: "Model Comparison", href: "#comparison" },
+const features = [
+    {
+        icon: Database,
+        number: "01",
+        title: "Dataset exploration",
+        description:
+            "Upload CSV datasets, inspect their structure, understand column types, identify missing values, and explore data quality.",
+    },
+    {
+        icon: SlidersHorizontal,
+        number: "02",
+        title: "Data preparation",
+        description:
+            "Prepare datasets for machine learning through preprocessing, feature engineering, encoding, scaling, and data transformation.",
+    },
+    {
+        icon: FlaskConical,
+        number: "03",
+        title: "Model training",
+        description:
+            "Experiment with classification and regression algorithms, configure training runs, and explore different approaches.",
+    },
+    {
+        icon: Target,
+        number: "04",
+        title: "Hyperparameter tuning",
+        description:
+            "Explore model configurations, optimize hyperparameters, and discover approaches that can improve performance.",
+    },
+    {
+        icon: BarChart3,
+        number: "05",
+        title: "Model evaluation",
+        description:
+            "Understand model performance through evaluation metrics, visualizations, and meaningful performance comparisons.",
+    },
+    {
+        icon: GitCompareArrows,
+        number: "06",
+        title: "Experiment tracking",
+        description:
+            "Keep training runs organized, revisit previous experiments, compare models, and track your experimentation progress.",
+    },
 ];
 
-function Sidebar() {
+const workflow = [
+    {
+        number: "01",
+        title: "Upload your dataset",
+        description:
+            "Bring your CSV dataset into ModelForge and get started with your machine learning workflow.",
+        icon: Upload,
+    },
+    {
+        number: "02",
+        title: "Explore and prepare",
+        description:
+            "Understand your data, inspect its quality, and prepare it for machine learning.",
+        icon: Database,
+    },
+    {
+        number: "03",
+        title: "Train and experiment",
+        description:
+            "Choose algorithms, configure experiments, and explore different model approaches.",
+        icon: FlaskConical,
+    },
+    {
+        number: "04",
+        title: "Evaluate and compare",
+        description:
+            "Analyze performance metrics, compare experiments, and understand your results.",
+        icon: BarChart3,
+    },
+    {
+        number: "05",
+        title: "Track your progress",
+        description:
+            "Keep your experiments organized and use previous results to guide future experiments.",
+        icon: GitCompareArrows,
+    },
+];
+
+const benefits = [
+    {
+        icon: Layers3,
+        title: "One organized workspace",
+        description:
+            "Bring datasets, training runs, and experiment results together in one place.",
+    },
+    {
+        icon: Microscope,
+        title: "Experiment with confidence",
+        description:
+            "Explore different algorithms and configurations to understand what works best.",
+    },
+    {
+        icon: BarChart3,
+        title: "Understand your results",
+        description:
+            "Go beyond predictions with meaningful evaluation metrics and visual comparisons.",
+    },
+    {
+        icon: GitCompareArrows,
+        title: "Keep track of progress",
+        description:
+            "Revisit previous experiments and compare your approaches over time.",
+    },
+];
+
+function SectionLabel({ children }) {
     return (
-        <aside className="flex w-full shrink-0 flex-col border-b border-(--border) bg-white p-5 md:sticky md:top-0 md:h-screen md:w-64 md:self-start md:overflow-y-auto md:border-r md:border-b-0">
-            <a href="#overview" className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-(--forest) text-xl text-white">
-                    M
-                </span>
-                <span>
-                    <span className="block text-lg font-bold tracking-tight">
-                        ModelForge
-                    </span>
-                    <span className="text-xs text-(--muted)">ML workspace</span>
-                </span>
-            </a>
-            <p className="mb-3 mt-9 text-xs font-semibold uppercase tracking-widest text-(--muted)">
-                Workspace
-            </p>
-            <nav
-                aria-label="Main navigation"
-                className="flex flex-wrap gap-2 md:flex-col"
-            >
-                {navigation.map((item) => (
-                    <a
-                        key={item.label}
-                        href={item.href}
-                        aria-current={item.active ? "page" : undefined}
-                        className={`flex items-center gap-3 rounded-xl p-3 text-sm font-medium transition ${item.active ? "bg-(--mint) text-(--forest)" : "text-(--primary) hover:bg-background"}`}
-                    >
-                        <span aria-hidden="true" className="text-lg">
-                            {item.icon}
-                        </span>
-                        {item.label}
-                    </a>
-                ))}
-            </nav>
-            <div className="mt-8 rounded-2xl bg-(--forest) p-4 to-white md:mt-auto">
-                <span className="text-sm font-semibold text-white">
-                    Your ML journey
-                </span>
-                <p className="mt-2 text-xs leading-5 text-white/70">
-                    Inspect your data first. Build reliable models next.
-                </p>
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/20">
-                    <div className="h-full w-[15%] rounded-full bg-(--accent)"></div>
-                </div>
-                <p className="mt-2 text-xs text-white/70">Workspace setup</p>
-            </div>
-        </aside>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-green-800">
+            <span className="h-2 w-2 rounded-full bg-green-600" />
+            {children}
+        </div>
     );
 }
 
-function OverviewCard({ card }) {
+function PrimaryButton({ children, href = "/sign-up" }) {
     return (
-        <article className="rounded-2xl border border-(--border) bg-white p-5">
-            <div className="flex items-start justify-between gap-3">
-                <p className="text-sm text-(--muted)">{card.label}</p>
-                <span
-                    style={{ backgroundColor: card.color }}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-lg"
-                    aria-hidden="true"
-                >
-                    {card.icon}
-                </span>
-            </div>
-            <p className="mt-5 text-3xl font-semibold tracking-tight">
-                {card.value}
-            </p>
-            <p className="mt-2 text-xs text-(--muted)">{card.note}</p>
-        </article>
+        <Link
+            href={href}
+            className="group inline-flex items-center justify-center gap-2 rounded-xl bg-green-800 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-green-900/10 transition hover:-translate-y-0.5 hover:bg-green-900"
+        >
+            {children}
+            <ArrowRight
+                size={17}
+                className="transition-transform group-hover:translate-x-1"
+            />
+        </Link>
     );
 }
 
-export default function Home() {
-    const { getToken, isLoaded, isSignedIn } = useAuth();
-    const [dataset, setDataset] = useState(null);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [trainingResult, setTrainingResult] = useState(null);
-    const [selectedHistogram, setSelectedHistogram] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("");
-    const [taskType, setTaskType] = useState("classification");
-    const [targetColumn, setTargetColumn] = useState("");
-    const [testSize, setTestSize] = useState("0.2");
-    const [isTraining, setIsTraining] = useState(false);
-    const [trainingError, setTrainingError] = useState("");
-    const [savedDatasets, setSavedDatasets] = useState([]);
-    const [isLoadingDatasets, setIsLoadingDatasets] = useState(false);
-    const [datasetsError, setDatasetsError] = useState("");
-    const [loadingDatasetId, setLoadingDatasetId] = useState(null);
-    const [activeDatasetId, setActiveDatasetId] = useState(null);
-    const [deletingDatasetId, setDeletingDatasetId] = useState(null);
-    const analysisRef = useRef(null);
-    const missingChartData = dataset
-        ? Object.entries(dataset.missing_by_column)
-              .filter(([, count]) => count > 0)
-              .map(([column, count]) => ({
-                  column,
-                  missing: count,
-              }))
-        : [];
-
-    const columnTypeData = dataset
-        ? [
-              { name: "Numeric", value: dataset.numeric_columns.length },
-              {
-                  name: "Non-numeric",
-                  value: dataset.non_numeric_columns.length,
-              },
-          ]
-        : [];
-
-    const histogramColumns = dataset
-        ? Object.keys(dataset.histograms || {}).filter(
-              (column) => dataset.histograms[column].length > 0,
-          )
-        : [];
-
-    const histogramData =
-        dataset?.histograms?.[selectedHistogram]?.map((bin) => ({
-            range: `${bin.bin_start.toFixed(1)}-${bin.bin_end.toFixed(1)}`,
-            count: bin.count,
-        })) || [];
-
-    const categoricalColumns = dataset
-        ? Object.keys(dataset.categorical_distributions || {}).filter(
-              (column) => dataset.categorical_distributions[column].length > 0,
-          )
-        : [];
-
-    const categoricalData =
-        dataset?.categorical_distributions?.[selectedCategory] || [];
-
-    const overviewCards = [
-        {
-            label: "Total rows",
-            value: dataset ? dataset.rows.toLocaleString() : "—",
-            note: "Rows in your dataset",
-            color: "#dff3e4",
-            icon: "▤",
-        },
-        {
-            label: "Features",
-            value: dataset ? dataset.columns.toLocaleString() : "—",
-            note: "Columns in your data",
-            color: "#e8eaff",
-            icon: "◫",
-        },
-        {
-            label: "Missing values",
-            value: dataset ? dataset.total_missing.toLocaleString() : "—",
-            note: "Missing cells detected",
-            color: "#f6e7e5",
-            icon: "◇",
-        },
-        {
-            label: "Duplicate rows",
-            value: dataset ? dataset.duplicate_rows.toLocaleString() : "—",
-            note: "Duplicate rows detected",
-            color: "#eeeaf2",
-            icon: "⧉",
-        },
-    ];
-
-    function handleUploadSuccess(data) {
-        setDataset(data);
-        setActiveDatasetId(data.dataset_id);
-        setTrainingResult(null);
-        setTrainingError("");
-        setTargetColumn("");
-        fetchSavedDatasets();
-        analysisRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-        });
-    }
-
-    async function handleLoadSavedDataset(datasetId) {
-        setLoadingDatasetId(datasetId);
-        setDatasetsError("");
-        try {
-            const token = await getToken();
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/${datasetId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                },
-            );
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.detail || "Unable to load saved dataset.");
-            }
-            setDataset(data);
-            setActiveDatasetId(data.dataset_id);
-            setSelectedFile(null);
-            setTrainingResult(null);
-            setTrainingError("");
-            setTargetColumn("");
-            analysisRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-            });
-        } catch (error) {
-            setDatasetsError(error.message);
-        } finally {
-            setLoadingDatasetId(null);
-        }
-    }
-
-    async function handleTrainModel(event) {
-        event.preventDefault();
-        if (!activeDatasetId || !targetColumn || isTraining) {
-            return;
-        }
-        setIsTraining(true);
-        setTrainingError("");
-        setTrainingResult(null);
-        try {
-            const formData = new FormData();
-            formData.append("dataset_id", activeDatasetId);
-            formData.append("target_column", targetColumn);
-            formData.append("task_type", taskType);
-            formData.append("test_size", testSize);
-            const token = await getToken();
-            if (!token) {
-                throw new Error(
-                    "Authentication required. Please sign in again.",
-                );
-            }
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/models/train`,
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: formData,
-                },
-            );
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(
-                    data.detail || "Model training failed. Please try again.",
-                );
-            }
-            setTrainingResult(data);
-        } catch (error) {
-            setTrainingError(
-                error instanceof Error
-                    ? error.message
-                    : "Something went wrong while training the model.",
-            );
-        } finally {
-            setIsTraining(false);
-        }
-    }
-
-    async function fetchSavedDatasets() {
-        setIsLoadingDatasets(true);
-        setDatasetsError("");
-        try {
-            const token = await getToken();
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                },
-            );
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(
-                    data.detail || "Unable to load saved datasets.",
-                );
-            }
-            setSavedDatasets(Array.isArray(data) ? data : data.datasets || []);
-        } catch (error) {
-            setDatasetsError(error.message);
-        } finally {
-            setIsLoadingDatasets(false);
-        }
-    }
-
-    async function handleDeleteDataset(datasetId) {
-        setDeletingDatasetId(datasetId);
-        setDatasetsError("");
-        try {
-            const token = await getToken();
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/datasets/${datasetId}`,
-                {
-                    method: "DELETE",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                },
-            );
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(data.detail || "Unable to delete dataset.");
-            }
-            if (activeDatasetId === datasetId) {
-                setDataset(null);
-                setActiveDatasetId(null);
-                setSelectedFile(null);
-                setTrainingResult(null);
-                setTrainingError("");
-                setTargetColumn("");
-            }
-            await fetchSavedDatasets();
-        } catch (error) {
-            setDatasetsError(error.message);
-        } finally {
-            setDeletingDatasetId(null);
-        }
-    }
-
-    useEffect(() => {
-        if (histogramColumns.length > 0) {
-            setSelectedHistogram((current) =>
-                histogramColumns.includes(current)
-                    ? current
-                    : histogramColumns[0],
-            );
-        } else {
-            setSelectedHistogram("");
-        }
-    }, [dataset]);
-
-    useEffect(() => {
-        if (categoricalColumns.length > 0) {
-            setSelectedCategory((current) =>
-                categoricalColumns.includes(current)
-                    ? current
-                    : categoricalColumns[0],
-            );
-        } else {
-            setSelectedCategory("");
-        }
-    }, [dataset]);
-
-    useEffect(() => {
-        if (!isLoaded) return;
-        if (!isSignedIn) {
-            setSavedDatasets([]);
-            return;
-        }
-        fetchSavedDatasets();
-    }, [isLoaded, isSignedIn, getToken]);
-
+function ProductPreview() {
     return (
-        <div className="min-h-screen md:h-screen md:overflow-hidden md:flex">
-            <Sidebar />
-            <main className="min-w-0 flex-1 md:overflow-y-auto px-5 py-7 sm:px-8 lg:px-10">
-                <header className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <p className="text-sm text-(--muted)">
-                            Workspace / Overview
-                        </p>
-                        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-                            Good to see you.
-                        </h1>
-                        <p className="mt-2 text-sm text-(--muted)">
-                            Get your data ready for machine learning.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Show when="signed-out">
-                            <SignInButton mode="modal">
-                                <button
-                                    type="button"
-                                    className="rounded-xl border border-(--border) bg-white px-4 py-2 text-sm font-medium text-(--primary) transition hover:bg-background"
-                                >
-                                    Sign In
-                                </button>
-                            </SignInButton>
-                            <SignUpButton mode="modal">
-                                <button
-                                    type="button"
-                                    className="rounded-xl bg-(--forest) px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-                                >
-                                    Sign Up
-                                </button>
-                            </SignUpButton>
-                        </Show>
-                        <Show when="signed-in">
-                            <span className="rounded-full border border-(--border) bg-white px-4 py-2 text-xs font-medium text-(--primary)">
-                                Workspace ready
-                            </span>
-                            <SignOutButton>
-                                <button
-                                    type="button"
-                                    className="rounded-xl border border-(--border) bg-white px-4 py-2 text-sm font-medium text-(--primary) transition hover:bg-background"
-                                >
-                                    Log Out
-                                </button>
-                            </SignOutButton>
-                            <UserButton />
-                        </Show>
-                    </div>
-                </header>
-                <section id="overview" className="mt-9">
-                    <div className="mb-4">
-                        <h2 className="text-lg font-semibold">
-                            Dataset Overview
-                        </h2>
-                        <p className="mt-1 text-sm text-(--muted)">
-                            Your dataset metrics will appear here after upload.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                        {overviewCards.map((card) => (
-                            <OverviewCard key={card.label} card={card} />
-                        ))}
-                    </div>
-                </section>
-                <section id="inspector" className="mt-8">
-                    <div className="mb-4">
-                        <h2 className="text-lg font-semibold">
-                            Dataset Inspector
-                        </h2>
-                        <p className="mt-1 text-sm text-(--muted)">
-                            Start with a CSV file to understand its quality and
-                            structure.
-                        </p>
-                    </div>
-                    <div className="rounded-2xl border border-(--border) bg-white p-6 sm:p-8">
-                        <DatasetUploader
-                            onUploadSuccess={handleUploadSuccess}
-                            onFileSelected={(file) => {
-                                setSelectedFile(file);
-                                setTrainingResult(null);
-                            }}
-                        />
-                    </div>
-                </section>
-                <section id="saved-datasets" className="mt-8">
-                    <div className="mb-4">
-                        <h2 className="text-lg font-semibold">
-                            Your Saved Datasets
-                        </h2>
-                        <p className="mt-1 text-sm text-(--muted)">
-                            Datasets you&apos;ve uploaded previously.
-                        </p>
-                    </div>
-                    <div className="rounded-2xl border border-(--border) bg-white p-5">
-                        {isLoadingDatasets ? (
-                            <p className="text-sm text-(--muted)">
-                                Loading your datasets...
-                            </p>
-                        ) : datasetsError ? (
-                            <p role="alert" className="text-sm text-red-600">
-                                {datasetsError}
-                            </p>
-                        ) : savedDatasets.length === 0 ? (
-                            <p className="text-sm text-(--muted)">
-                                No saved datasets yet. Upload a CSV file to get
-                                started.
-                            </p>
-                        ) : (
-                            <div className="space-y-3">
-                                {savedDatasets.map((item) => (
-                                    <div
-                                        key={item.dataset_id}
-                                        onClick={() =>
-                                            handleLoadSavedDataset(
-                                                item.dataset_id,
-                                            )
-                                        }
-                                        className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-(--border) p-4 cursor-pointer transition hover:border-blue-400 hover:bg-blue-50/50"
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            {loadingDatasetId ===
-                                                item.dataset_id && (
-                                                <p className="text-xs text-blue-600">
-                                                    Loading dataset...
-                                                </p>
-                                            )}
-                                            <p className="truncate text-sm font-semibold">
-                                                {item.filename}
-                                            </p>
-                                            <p className="mt-1 text-xs text-(--muted)">
-                                                {item.rows.toLocaleString()}{" "}
-                                                rows
-                                                {" · "}
-                                                {item.columns} columns
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <p className="text-xs text-(--muted)">
-                                                {new Date(
-                                                    item.created_at,
-                                                ).toLocaleDateString()}
-                                            </p>
-                                            <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    handleDeleteDataset(
-                                                        item.dataset_id,
-                                                    );
-                                                }}
-                                                disabled={
-                                                    deletingDatasetId ===
-                                                    item.dataset_id
-                                                }
-                                                className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                {deletingDatasetId ===
-                                                item.dataset_id
-                                                    ? "Deleting..."
-                                                    : "Delete"}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </section>
-                {dataset && (
-                    <section
-                        ref={analysisRef}
-                        className="mt-8 space-y-6 scroll-mt-6"
-                    >
+        <div className="relative mx-auto w-full max-w-145">
+            <div className="absolute -inset-6 rounded-[40px] bg-green-200/40 blur-3xl" />
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-green-950/10">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                    <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-900 text-white">
+                            <BarChart3 size={17} />
+                        </div>
                         <div>
-                            <h2 className="text-xl font-semibold">
-                                Dataset analysis
-                            </h2>
-                            <p className="mt-1 text-sm text-(--muted)">
-                                {dataset.filename} ·{" "}
-                                {dataset.memory_usage_bytes
-                                    ? `${(dataset.memory_usage_bytes / 1024).toFixed(1)} KB in memory`
-                                    : "Memory usage unavailable"}
+                            <p className="text-sm font-bold text-gray-900">
+                                ModelForge
+                            </p>
+                            <p className="text-[10px] text-gray-400">
+                                ML Workspace
                             </p>
                         </div>
-                        <div className="overflow-hidden rounded-2xl border border-(--border) bg-white">
-                            <div className="border-b border-(--border) p-5">
-                                <h3 className="font-semibold">
-                                    Column overview
-                                </h3>
-                                <p className="mt-1 text-sm text-(--muted)">
-                                    Data types, unique values, and missing data
-                                    for each column.
-                                </p>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-background text-(--muted)">
-                                        <tr>
-                                            <th className="px-5 py-3 font-medium">
-                                                Column
-                                            </th>
-                                            <th className="px-5 py-3 font-medium">
-                                                Data types
-                                            </th>
-                                            <th className="px-5 py-3 font-medium">
-                                                Unique values
-                                            </th>
-                                            <th className="px-5 py-3 font-medium">
-                                                Missing
-                                            </th>
-                                            <th className="px-5 py-3 font-medium">
-                                                Missing %
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {Object.entries(
-                                            dataset.column_types,
-                                        ).map(([column, type]) => (
-                                            <tr
-                                                key={column}
-                                                className="border-t border-(--border)"
-                                            >
-                                                <td className="whitespace-nowrap px-5 py-3 font-medium">
-                                                    {column}
-                                                </td>
-                                                <td className="px-5 py-3">
-                                                    <span className="rounded-md bg-background px-2 py-1">
-                                                        {type}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-3">
-                                                    {dataset
-                                                        .unique_values_by_column?.[
-                                                        column
-                                                    ] ?? "-"}
-                                                </td>
-                                                <td className="px-5 py-3">
-                                                    {dataset
-                                                        .missing_by_column?.[
-                                                        column
-                                                    ] ?? 0}
-                                                </td>
-                                                <td className="px-5 py-3">
-                                                    {(
-                                                        dataset
-                                                            .missing_percentage?.[
-                                                            column
-                                                        ] ?? 0
-                                                    ).toFixed(2)}
-                                                    %
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                            <div className="rounded-2xl border border-(--border) bg-white p-5">
-                                <h3 className="text-lg font-semibold text-slate-800">
-                                    Missing Values by Column
-                                </h3>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Number of empty values in each column
-                                </p>
-                                <div className="mt-5 h-72 w-full">
-                                    {missingChartData.length > 0 ? (
-                                        <ResponsiveContainer
-                                            width="100%"
-                                            height="100%"
-                                        >
-                                            <BarChart
-                                                data={missingChartData}
-                                                margin={{
-                                                    top: 10,
-                                                    right: 10,
-                                                    left: 0,
-                                                    bottom: 45,
-                                                }}
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis
-                                                    dataKey="column"
-                                                    angle={-35}
-                                                    textAnchor="end"
-                                                    interval={0}
-                                                    tick={{ fontSize: 11 }}
-                                                />
-                                                <YAxis allowDecimals={false} />
-                                                <Tooltip />
-                                                <Bar
-                                                    dataKey="missing"
-                                                    name="Missing values"
-                                                    fill="#0d9488"
-                                                    radius={[5, 5, 0, 0]}
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                                            No missing values found.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-(--border) bg-white p-5">
-                                <h3 className="text-lg font-semibold text-slate-800">
-                                    Column Type Distribution
-                                </h3>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Numeric vs non-numeric features
-                                </p>
-                                <div className="mt-5 h-72 w-full">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <PieChart>
-                                            <Pie
-                                                data={columnTypeData}
-                                                dataKey="value"
-                                                nameKey="name"
-                                                cx="50%"
-                                                cy="45%"
-                                                outerRadius={85}
-                                                label={({ name, value }) =>
-                                                    `${name}: ${value}`
-                                                }
-                                            >
-                                                <Cell fill="#0d9488" />
-                                                <Cell fill="#64748b" />
-                                            </Pie>
-                                            <Tooltip />
-                                            <Legend />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-(--border) bg-white p-5">
-                            <h3 className="text-lg font-semibold text-slate-800">
-                                Numeric Feature Distribution
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Explore how values are distributed across a
-                                numeric column.
-                            </p>
-                            <div className="mt-5">
-                                <label
-                                    htmlFor="histogram-column"
-                                    className="mb-2 block text-sm font-medium text-slate-700"
-                                >
-                                    Select numeric column
-                                </label>
-                                <select
-                                    id="histogram-column"
-                                    value={selectedHistogram}
-                                    onChange={(e) =>
-                                        setSelectedHistogram(e.target.value)
-                                    }
-                                    className="w-full rounded-lg border border-(--border) bg-white px-3 py-2 text-sm outline-none sm:w-64"
-                                >
-                                    {histogramColumns.map((column) => (
-                                        <option key={column} value={column}>
-                                            {column}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="mt-6 h-80 w-full">
-                                {histogramColumns.length > 0 ? (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={histogramData}
-                                            margin={{
-                                                top: 10,
-                                                right: 10,
-                                                left: 0,
-                                                bottom: 45,
-                                            }}
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis
-                                                dataKey="range"
-                                                angle={-35}
-                                                textAnchor="end"
-                                                interval={0}
-                                                tick={{ fontSize: 10 }}
-                                            />
-                                            <YAxis allowDecimals={false} />
-                                            <Tooltip />
-                                            <Bar
-                                                dataKey="count"
-                                                name="Values"
-                                                fill="#0d9488"
-                                                radius={[4, 4, 0, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                                        No usable numeric columns are available.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-(--border) bg-white p-5">
-                            <h3 className="text-lg font-semibold text-slate-800">
-                                Categorical Feature Distribution
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Explore the frequency of values in categorical
-                                columns.
-                            </p>
-                            <div className="mt-5">
-                                <label
-                                    htmlFor="category-column"
-                                    className="mb-2 block text-sm font-medium text-slate-700"
-                                >
-                                    Select categorical column
-                                </label>
-                                <select
-                                    id="category-column"
-                                    value={selectedCategory}
-                                    onChange={(event) =>
-                                        setSelectedCategory(event.target.value)
-                                    }
-                                    className="w-full rounded-lg border border-(--border) bg-white px-3 py-2 text-sm outline-none sm:w-64"
-                                >
-                                    {categoricalColumns.map((column) => (
-                                        <option key={column} value={column}>
-                                            {column}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="mt-6 h-80 w-full">
-                                {categoricalData.length > 0 ? (
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={categoricalData}
-                                            margin={{
-                                                top: 10,
-                                                right: 10,
-                                                left: 0,
-                                                bottom: 45,
-                                            }}
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis
-                                                dataKey="category"
-                                                angle={-35}
-                                                textAnchor="end"
-                                                interval={0}
-                                                tick={{ fontSize: 11 }}
-                                            />
-                                            <YAxis allowDecimals={false} />
-                                            <Tooltip />
-                                            <Bar
-                                                dataKey="count"
-                                                name="Count"
-                                                fill="#64748b"
-                                                radius={[4, 4, 0, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                                        No categorical values available.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        {dataset.numeric_stats &&
-                            Object.keys(dataset.numeric_stats).length > 0 && (
-                                <div className="overflow-hidden rounded-2xl border border-(--border) bg-white">
-                                    <div className="border border-(--border) p-5">
-                                        <h3 className="font-semibold">
-                                            Numeric column statistics
-                                        </h3>
-                                        <p className="mt-1 text-sm text-(--muted)">
-                                            Summary statistics to help you
-                                            understand numeric features.
-                                        </p>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm">
-                                            <thead className="bg-background text-(--muted)">
-                                                <tr>
-                                                    <th className="px-5 py-3 font-medium">
-                                                        Column
-                                                    </th>
-                                                    <th className="px-5 py-3 font-medium">
-                                                        Mean
-                                                    </th>
-                                                    <th className="px-5 py-3 font-medium">
-                                                        Median
-                                                    </th>
-                                                    <th className="px-5 py-3 font-medium">
-                                                        Minimum
-                                                    </th>
-                                                    <th className="px-5 py-3 font-medium">
-                                                        Maximum
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {Object.entries(
-                                                    dataset.numeric_stats,
-                                                ).map(([column, stats]) => (
-                                                    <tr
-                                                        key={column}
-                                                        className="border-t border-(--border)"
-                                                    >
-                                                        <td className="whitespace-nowrap px-5 py-3 font-medium">
-                                                            {column}
-                                                        </td>
-                                                        {[
-                                                            "mean",
-                                                            "median",
-                                                            "min",
-                                                            "max",
-                                                        ].map((key) => (
-                                                            <td
-                                                                key={key}
-                                                                className="whitespace-nowrap px-5 py-3 tabular-nums"
-                                                            >
-                                                                {stats[key] ==
-                                                                null
-                                                                    ? "-"
-                                                                    : Number(
-                                                                          stats[
-                                                                              key
-                                                                          ],
-                                                                      ).toLocaleString(
-                                                                          undefined,
-                                                                          {
-                                                                              maximumFractionDigits: 2,
-                                                                          },
-                                                                      )}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        {dataset.dataset_warnings?.length > 0 && (
-                            <div className="rounded-2xl border border-(--rose)/50 bg-[#f6e7e5] p-5">
-                                <h3 className="font-semibold text-(--forest)">
-                                    Data-quality warnings
-                                </h3>
-                                <ul className="mt-3 space-y-3">
-                                    {dataset.dataset_warnings.map((warning) => (
-                                        <li
-                                            key={warning}
-                                            className="flex items-start gap-2 text-sm text-(--forest)"
-                                        >
-                                            <span aria-hidden="true">!</span>
-                                            <span>{warning}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </section>
-                )}
-                {dataset && activeDatasetId && (
-                    <section
-                        id="training"
-                        className="mt-8 rounded-2xl border border-(--border) bg-white p-6 sm:p-8"
-                    >
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold">
-                                Baseline Model Training
-                            </h2>
-                            <p className="mt-2 text-sm text-(--muted)">
-                                Train a baseline model and evaluate its
-                                performance on unseen data.
-                            </p>
-                        </div>
-                        <form onSubmit={handleTrainModel} className="space-y-5">
-                            <div>
-                                <label
-                                    htmlFor="target-column"
-                                    className="mb-2 block text-sm font-medium"
-                                >
-                                    Target Column
-                                </label>
-                                <select
-                                    id="target-column"
-                                    value={targetColumn}
-                                    onChange={(e) =>
-                                        setTargetColumn(e.target.value)
-                                    }
-                                    required
-                                    className="w-full rounded-lg border border-(--border) bg-white p-3 text-sm"
-                                >
-                                    <option value="">
-                                        Select target column
-                                    </option>
-                                    {Object.keys(
-                                        dataset.column_types || {},
-                                    ).map((column) => (
-                                        <option key={column} value={column}>
-                                            {column}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="mt-1 text-xs text-(--muted)">
-                                    Choose the column you want to predict.
-                                </p>
-                            </div>
-                            <div className="grid gap-5 sm:grid-cols-2">
-                                <div>
-                                    <label
-                                        htmlFor="task-type"
-                                        className="mb-2 block text-sm font-medium"
-                                    >
-                                        Machine Learning Task
-                                    </label>
-                                    <select
-                                        id="task-type"
-                                        value={taskType}
-                                        onChange={(e) =>
-                                            setTaskType(e.target.value)
-                                        }
-                                        className="w-full rounded-lg border border-(--border) bg-white p-3 text-sm"
-                                    >
-                                        <option value="classification">
-                                            Classification
-                                        </option>
-                                        <option value="regression">
-                                            Regression
-                                        </option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label
-                                        htmlFor="test-size"
-                                        className="mb-2 block text-sm font-medium"
-                                    >
-                                        Test Data Split
-                                    </label>
-                                    <select
-                                        id="test-size"
-                                        value={testSize}
-                                        onChange={(e) =>
-                                            setTestSize(e.target.value)
-                                        }
-                                        className="w-full rounded-lg border border-(--border) bg-white p-3 text-sm"
-                                    >
-                                        <option value="0.1">10%</option>
-                                        <option value="0.2">20%</option>
-                                        <option value="0.3">30%</option>
-                                        <option value="0.4">40%</option>
-                                    </select>
-                                </div>
-                            </div>
-                            {trainingError && (
-                                <p
-                                    role="alert"
-                                    className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-                                >
-                                    {trainingError}
-                                </p>
-                            )}
-                            <button
-                                type="submit"
-                                disabled={isTraining || !targetColumn}
-                                className="rounded-lg bg-(--forest) px-5 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        <span className="text-xs text-gray-500">Workspace</span>
+                    </div>
+                </div>
+                <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[145px_1fr]">
+                    <div className="min-h-85 border-r border-gray-100 bg-gray-50/80 p-3 sm:p-4">
+                        <p className="mb-4 text-[9px] font-bold tracking-widest text-gray-400 sm:text-[10px]">
+                            WORKSPACE
+                        </p>
+                        {[
+                            "Overview",
+                            "Dataset Inspector",
+                            "Experiments",
+                            "Model Comparison",
+                        ].map((item, index) => (
+                            <div
+                                key={item}
+                                className={`mb-2 flex items-center gap-2 rounded-lg px-2 py-2.5 text-[9px] sm:gap-3 sm:px-3 sm:text-[11px] ${
+                                    index === 0
+                                        ? "bg-green-100 font-semibold text-green-900"
+                                        : "text-gray-500"
+                                }`}
                             >
-                                {isTraining
-                                    ? "Training Model..."
-                                    : "Train Baseline Model"}
-                            </button>
-                        </form>
-                    </section>
-                )}
-                {trainingResult && (
-                    <section className="mt-6 rounded-2xl border border-(--border) bg-white p-6 sm:p-8">
-                        <div className="mb-6">
-                            <h2 className="text-xl font-semibold">
-                                Training Results
-                            </h2>
-                            <p className="mt-2 text-sm text-(--muted)">
-                                {trainingResult.model} ·{" "}
-                                {trainingResult.task_type}
+                                {index === 0 && <BarChart3 size={13} />}
+                                {index === 1 && <Database size={13} />}
+                                {index === 2 && <FlaskConical size={13} />}
+                                {index === 3 && <GitCompareArrows size={13} />}
+                                <span>{item}</span>
+                            </div>
+                        ))}
+                        <div className="mt-10 rounded-lg bg-green-950 p-3 text-white">
+                            <Sparkles
+                                size={15}
+                                className="mb-2 text-green-300"
+                            />
+                            <p className="text-[10px] font-semibold">
+                                Your ML journey
+                            </p>
+                            <p className="mt-1 text-[9px] leading-relaxed text-green-100/70">
+                                Explore data. Train models. Compare results.
                             </p>
                         </div>
-                        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    </div>
+                    <div className="min-w-0 p-3 sm:p-5">
+                        <div className="mb-5">
+                            <p className="text-[10px] font-medium text-green-700">
+                                YOUR WORKSPACE
+                            </p>
+                            <h3 className="mt-1 text-base font-bold text-gray-900 sm:text-xl">
+                                Dashboard overview
+                            </h3>
+                            <p className="mt-1 text-[10px] text-gray-500 sm:text-xs">
+                                Your machine learning workspace at a glance.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
                             {[
                                 {
-                                    label: "Training Rows",
-                                    value: trainingResult.train_rows,
+                                    label: "Datasets",
+                                    value: "04",
+                                    icon: Database,
                                 },
                                 {
-                                    label: "Testing Rows",
-                                    value: trainingResult.test_rows,
+                                    label: "Experiments",
+                                    value: "12",
+                                    icon: FlaskConical,
                                 },
-                                {
-                                    label: "Features Used",
-                                    value: trainingResult.feature_count,
-                                },
-                            ].map((item) => (
+                            ].map((stat) => (
                                 <div
-                                    key={item.label}
-                                    className="rounded-xl bg-background p-4"
+                                    key={stat.label}
+                                    className="rounded-xl border border-gray-100 p-3 sm:p-4"
                                 >
-                                    <p className="text-sm text-(--muted)">
-                                        {item.label}
+                                    <stat.icon
+                                        size={16}
+                                        className="mb-3 text-green-700"
+                                    />
+                                    <p className="text-lg font-bold text-gray-900 sm:text-2xl">
+                                        {stat.value}
                                     </p>
-                                    <p className="mt-2 text-2xl font-semibold">
-                                        {Number(item.value).toLocaleString()}
+                                    <p className="mt-1 text-[10px] text-gray-500">
+                                        {stat.label}
                                     </p>
                                 </div>
                             ))}
                         </div>
-                        <h3 className="mb-4 font-semibold">
-                            Evaluation Metrics
-                        </h3>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {Object.entries(trainingResult.metrics || {}).map(
-                                ([metric, value]) => (
-                                    <div
-                                        key={metric}
-                                        className="rounded-xl border border-(--border) p-4"
-                                    >
-                                        <p className="text-sm capitalize text-(--muted)">
-                                            {metric.replaceAll("_", " ")}
-                                        </p>
-                                        <p className="mt-2 text-2xl font-semibold">
-                                            {value == null
-                                                ? "—"
-                                                : Number(value).toLocaleString(
-                                                      undefined,
-                                                      {
-                                                          maximumFractionDigits: 4,
-                                                      },
-                                                  )}
-                                        </p>
-                                    </div>
-                                ),
-                            )}
+                        <div className="mt-4 rounded-xl border border-gray-100 p-3 sm:p-4">
+                            <div className="mb-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-900">
+                                        Model performance
+                                    </p>
+                                    <p className="mt-1 text-[9px] text-gray-400">
+                                        Illustrative experiment comparison
+                                    </p>
+                                </div>
+                                <span className="rounded-md bg-green-50 px-2 py-1 text-[9px] font-medium text-green-800">
+                                    Regression
+                                </span>
+                            </div>
+                            <div className="flex h-24 items-end gap-3 border-b border-gray-100 px-2 sm:h-28">
+                                {[48, 72, 58, 90, 68, 100, 78, 86, 65, 95].map(
+                                    (height, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex-1 rounded-t-sm bg-green-600/80"
+                                            style={{ height: `${height}%` }}
+                                        />
+                                    ),
+                                )}
+                            </div>
+                            <div className="mt-3 flex justify-between text-[9px] text-gray-400">
+                                <span>Model A</span>
+                                <span>Model B</span>
+                                <span>Model C</span>
+                            </div>
                         </div>
-                    </section>
-                )}
-                <section className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <article
-                        id="experiments"
-                        className="rounded-2xl border border-(--border) bg-white p-6"
-                    >
-                        <span className="text-sm text-(--muted)">
-                            Coming in a later phase
-                        </span>
-                        <h2 className="mt-3 text-lg font-semibold">
-                            Experiment tracking
-                        </h2>
-                        <p className="mt-2 text-sm leading-6 text-(--muted)">
-                            Keep track of training runs, model settings, and
-                            evaluation results in one workspace.
-                        </p>
-                    </article>
-                    <article
-                        id="comparison"
-                        className="rounded-2xl border border-(--border) bg-white p-6"
-                    >
-                        <span className="text-sm text-(--muted)">
-                            Coming in a later phase
-                        </span>
-                        <h2 className="mt-3 text-lg font-semibold">
-                            Model comparison
-                        </h2>
-                        <p className="mt-2 text-sm leading-6 text-(--muted)">
-                            Compare model performance using appropriate
-                            evaluation metrics once training is available.
-                        </p>
-                    </article>
-                </section>
-                <footer className="pb-4 pt-10 text-center text-xs text-(--muted)">
-                    ModelForge · Build thoughtfully. Evaluate reliably.
-                </footer>
-            </main>
+                        <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 p-3">
+                            <Check size={15} className="text-green-700" />
+                            <p className="text-[9px] text-green-900 sm:text-[10px]">
+                                Your experiments, organized in one place.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-xl sm:flex">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-800">
+                    <GitCompareArrows size={20} />
+                </div>
+                <div>
+                    <p className="text-xs font-bold text-gray-900">
+                        Compare experiments
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                        Understand model performance
+                    </p>
+                </div>
+            </div>
         </div>
+    );
+}
+
+export default function HomePage() {
+    return (
+        <main className="overflow-hidden bg-[#fcfdfb] text-gray-900">
+            <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-xl">
+                <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
+                    <Link href="/" className="flex items-center">
+                        <Image
+                            src="/model-forge-image.png"
+                            alt="ModelForge"
+                            width={240}
+                            height={96}
+                            priority
+                            className="h-10 w-auto object-contain sm:h-12"
+                        />
+                    </Link>
+                    <div className="hidden items-center gap-8 md:flex">
+                        <Link
+                            href="#features"
+                            className="text-sm font-medium text-gray-600 transition hover:text-green-800"
+                        >
+                            Features
+                        </Link>
+                        <Link
+                            href="#workflow"
+                            className="text-sm font-medium text-gray-600 transition hover:text-green-800"
+                        >
+                            How it works
+                        </Link>
+                        <Link
+                            href="#why-modelforge"
+                            className="text-sm font-medium text-gray-600 transition hover:text-green-800"
+                        >
+                            Why ModelForge
+                        </Link>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Show when="signed-out">
+                            <Link
+                                href="/sign-in"
+                                className="hidden rounded-lg px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 sm:inline-flex"
+                            >
+                                Sign in
+                            </Link>
+                            <PrimaryButton>Get started</PrimaryButton>
+                        </Show>
+                        <Show when="signed-in">
+                            <Link
+                                href="/dashboard"
+                                className="inline-flex items-center gap-2 rounded-xl bg-green-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-900"
+                            >
+                                Open dashboard
+                                <ArrowRight size={16} />
+                            </Link>
+                        </Show>
+                    </div>
+                </nav>
+                <div className="border-t border-gray-100 px-5 py-3 md:hidden">
+                    <div className="flex items-center justify-center gap-7 text-xs font-medium text-gray-600">
+                        <Link href="#features">Features</Link>
+                        <Link href="#workflow">How it works</Link>
+                        <Link href="#why-modelforge">Why ModelForge</Link>
+                    </div>
+                </div>
+            </header>
+            <section className="relative px-5 pb-24 pt-20 sm:px-8 sm:pt-28 lg:px-12 lg:pb-32">
+                <div className="pointer-events-none absolute -right-40 -top-40 h-125 w-125 rounded-full bg-green-100/60 blur-3xl" />
+                <div className="pointer-events-none absolute -left-40 bottom-0 h-87.5 w-87.5 rounded-full bg-emerald-50 blur-3xl" />
+                <div className="relative mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2 lg:gap-12">
+                    <div>
+                        <SectionLabel>ML experimentation platform</SectionLabel>
+                        <h1 className="max-w-2xl text-4xl font-bold leading-[1.12] tracking-tight text-gray-950 sm:text-5xl lg:text-[62px]">
+                            Build. Experiment.{" "}
+                            <span className="text-green-800">Improve.</span>
+                        </h1>
+                        <p className="mt-7 max-w-xl text-base leading-8 text-gray-600 sm:text-lg">
+                            Your machine learning workflow, all in one place.
+                            Explore datasets, train models, evaluate
+                            performance, and keep your experiments organized
+                            with ModelForge.
+                        </p>
+                        <div className="mt-9 flex flex-wrap items-center gap-4">
+                            <Show when="signed-out">
+                                <PrimaryButton>
+                                    Start experimenting
+                                </PrimaryButton>
+                                <Link
+                                    href="/sign-in"
+                                    className="inline-flex items-center gap-2 px-3 py-3 text-sm font-semibold text-gray-700 transition hover:text-green-800"
+                                >
+                                    Sign in
+                                    <ArrowUpRight size={16} />
+                                </Link>
+                            </Show>
+                            <Show when="signed-in">
+                                <PrimaryButton href="/dashboard">
+                                    Go to dashboard
+                                </PrimaryButton>
+                            </Show>
+                        </div>
+                        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-gray-500">
+                            <span className="flex items-center gap-2">
+                                <Check size={15} className="text-green-700" />
+                                Dataset exploration
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Check size={15} className="text-green-700" />
+                                Model evaluation
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Check size={15} className="text-green-700" />
+                                Experiment tracking
+                            </span>
+                        </div>
+                    </div>
+                    <ProductPreview />
+                </div>
+            </section>
+            <section className="border-y border-green-100 bg-green-50/70 px-5 py-7 sm:px-8 lg:px-12">
+                <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-12 gap-y-5 text-sm font-medium text-green-950/75">
+                    <span className="flex items-center gap-2">
+                        <FileSpreadsheet size={18} />
+                        CSV dataset support
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <Database size={18} />
+                        Dataset exploration
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <Zap size={18} />
+                        Model training
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <GitCompareArrows size={18} />
+                        Experiment comparison
+                    </span>
+                </div>
+            </section>
+            <section
+                id="features"
+                className="scroll-mt-24 px-5 py-24 sm:px-8 lg:px-12 lg:py-32"
+            >
+                <div className="mx-auto max-w-7xl">
+                    <div className="mx-auto max-w-2xl text-center">
+                        <SectionLabel>The experimentation toolkit</SectionLabel>
+                        <h2 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                            Everything you need to{" "}
+                            <span className="text-green-800">
+                                experiment smarter.
+                            </span>
+                        </h2>
+                        <p className="mt-5 text-base leading-7 text-gray-600">
+                            From understanding your data to evaluating your
+                            models, bring your machine learning experiments
+                            together in one organized workspace.
+                        </p>
+                    </div>
+                    <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {features.map((feature) => (
+                            <div
+                                key={feature.number}
+                                className="group rounded-2xl border border-gray-200 bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-green-200 hover:shadow-xl hover:shadow-green-950/5"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-green-800 transition group-hover:bg-green-800 group-hover:text-white">
+                                        <feature.icon size={23} />
+                                    </div>
+                                    <span className="text-xs font-semibold text-gray-300">
+                                        {feature.number}
+                                    </span>
+                                </div>
+                                <h3 className="mt-7 text-lg font-bold text-gray-900">
+                                    {feature.title}
+                                </h3>
+                                <p className="mt-3 text-sm leading-7 text-gray-500">
+                                    {feature.description}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            <section
+                id="workflow"
+                className="scroll-mt-24 bg-[#f2f7f2] px-5 py-24 sm:px-8 lg:px-12 lg:py-32"
+            >
+                <div className="mx-auto max-w-7xl">
+                    <div className="grid items-end gap-8 lg:grid-cols-2">
+                        <div>
+                            <SectionLabel>
+                                A clear experimentation process
+                            </SectionLabel>
+                            <h2 className="max-w-xl text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                                Your ML workflow,{" "}
+                                <span className="text-green-800">
+                                    made simpler.
+                                </span>
+                            </h2>
+                        </div>
+                        <p className="max-w-lg text-base leading-8 text-gray-600 lg:justify-self-end">
+                            Follow a structured approach to machine learning.
+                            Move from raw datasets to trained models and
+                            meaningful experiment comparisons.
+                        </p>
+                    </div>
+                    <div className="mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+                        {workflow.map((step) => (
+                            <div key={step.number} className="relative">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-green-200 bg-white text-green-800 shadow-sm">
+                                    <step.icon size={23} />
+                                </div>
+                                <p className="mt-7 text-xs font-bold tracking-widest text-green-700">
+                                    STEP {step.number}
+                                </p>
+                                <h3 className="mt-2 text-lg font-bold text-gray-950">
+                                    {step.title}
+                                </h3>
+                                <p className="mt-3 max-w-xs text-sm leading-7 text-gray-600">
+                                    {step.description}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            <section
+                id="why-modelforge"
+                className="scroll-mt-24 px-5 py-24 sm:px-8 lg:px-12 lg:py-32"
+            >
+                <div className="mx-auto max-w-7xl">
+                    <div className="mx-auto max-w-2xl text-center">
+                        <SectionLabel>Why ModelForge?</SectionLabel>
+                        <h2 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                            Focus on experiments.{" "}
+                            <span className="text-green-800">
+                                Not the clutter.
+                            </span>
+                        </h2>
+                        <p className="mt-5 text-base leading-7 text-gray-600">
+                            Machine learning involves trying, testing,
+                            evaluating, and learning. ModelForge is designed to
+                            make that process more organized and easier to
+                            understand.
+                        </p>
+                    </div>
+                    <div className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                        {benefits.map((benefit) => (
+                            <div
+                                key={benefit.title}
+                                className="rounded-2xl border border-gray-200 bg-white p-6"
+                            >
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-800">
+                                    <benefit.icon size={21} />
+                                </div>
+                                <h3 className="mt-5 text-base font-bold text-gray-900">
+                                    {benefit.title}
+                                </h3>
+                                <p className="mt-3 text-sm leading-7 text-gray-500">
+                                    {benefit.description}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            <section className="bg-[#f2f7f2] px-5 py-24 sm:px-8 lg:px-12 lg:py-32">
+                <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-2">
+                    <div className="order-2 lg:order-1">
+                        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-xl shadow-green-950/5 sm:p-8">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-5">
+                                <div>
+                                    <p className="text-xs font-semibold text-green-800">
+                                        EXPERIMENT COMPARISON
+                                    </p>
+                                    <h3 className="mt-1 text-lg font-bold text-gray-900">
+                                        Compare model performance
+                                    </h3>
+                                </div>
+                                <div className="rounded-lg bg-green-50 p-2.5 text-green-800">
+                                    <GitCompareArrows size={20} />
+                                </div>
+                            </div>
+                            <div className="mt-5 space-y-3">
+                                {[
+                                    {
+                                        name: "Random Forest",
+                                        score: "0.91",
+                                        width: "91%",
+                                    },
+                                    {
+                                        name: "Gradient Boosting",
+                                        score: "0.87",
+                                        width: "87%",
+                                    },
+                                    {
+                                        name: "Logistic Regression",
+                                        score: "0.78",
+                                        width: "78%",
+                                    },
+                                ].map((model, index) => (
+                                    <div
+                                        key={model.name}
+                                        className="rounded-xl border border-gray-100 p-4"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-xs font-semibold text-gray-800 sm:text-sm">
+                                                {model.name}
+                                            </p>
+                                            <span className="text-sm font-bold text-green-800">
+                                                {model.score}
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    index === 0
+                                                        ? "bg-green-700"
+                                                        : "bg-green-500/70"
+                                                }`}
+                                                style={{
+                                                    width: model.width,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="mt-4 text-[10px] text-gray-400">
+                                Illustrative comparison. Values are sample data,
+                                not live model results.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="order-1 lg:order-2">
+                        <SectionLabel>Built for experimentation</SectionLabel>
+                        <h2 className="text-3xl font-bold leading-tight tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                            Understand your models.{" "}
+                            <span className="text-green-800">
+                                Not just their predictions.
+                            </span>
+                        </h2>
+                        <p className="mt-6 text-base leading-8 text-gray-600">
+                            Every experiment gives you information. ModelForge
+                            helps keep that information organized so you can
+                            revisit your runs, evaluate metrics, and make
+                            meaningful comparisons.
+                        </p>
+                        <ul className="mt-8 space-y-4">
+                            {[
+                                "Keep a record of previous training runs",
+                                "Review model evaluation metrics",
+                                "Compare experiments side by side",
+                                "Manage your saved datasets",
+                            ].map((item) => (
+                                <li
+                                    key={item}
+                                    className="flex items-start gap-3 text-sm text-gray-700"
+                                >
+                                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800">
+                                        <Check size={13} />
+                                    </span>
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                        <Link
+                            href="/dashboard"
+                            className="mt-9 inline-flex items-center gap-2 text-sm font-bold text-green-800 transition hover:gap-3"
+                        >
+                            Explore your workspace
+                            <ArrowRight size={17} />
+                        </Link>
+                    </div>
+                </div>
+            </section>
+            <section className="px-5 pb-24 pt-24 sm:px-8 lg:px-12 lg:pb-28">
+                <div className="relative mx-auto max-w-7xl overflow-hidden rounded-4xl bg-green-950 px-7 py-16 text-center sm:px-12 sm:py-20">
+                    <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full border-45 border-green-800/40" />
+                    <div className="pointer-events-none absolute -bottom-40 -left-20 h-80 w-80 rounded-full bg-green-800/30 blur-2xl" />
+                    <div className="relative mx-auto max-w-2xl">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-green-800 text-green-100">
+                            <Sparkles size={23} />
+                        </div>
+                        <h2 className="mt-7 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                            Your next experiment starts here.
+                        </h2>
+                        <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-green-100/70 sm:text-base">
+                            Bring your datasets, explore different models, and
+                            make your machine learning experimentation workflow
+                            more organized with ModelForge.
+                        </p>
+                        <div className="mt-9 flex flex-wrap justify-center gap-4">
+                            <Show when="signed-out">
+                                <Link
+                                    href="/sign-up"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-green-950 transition hover:-translate-y-0.5 hover:bg-green-50"
+                                >
+                                    Start experimenting
+                                    <ArrowRight size={17} />
+                                </Link>
+                                <Link
+                                    href="/sign-in"
+                                    className="inline-flex items-center rounded-xl border border-green-700 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-green-900"
+                                >
+                                    Sign in
+                                </Link>
+                            </Show>
+                            <Show when="signed-in">
+                                <Link
+                                    href="/dashboard"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-green-950 transition hover:bg-green-50"
+                                >
+                                    Open dashboard
+                                    <ArrowRight size={17} />
+                                </Link>
+                            </Show>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <footer className="border-t border-gray-200 bg-white px-5 py-10 sm:px-8 lg:px-12">
+                <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
+                    <div className="flex flex-col items-center gap-2 sm:items-start">
+                        <Link href="/">
+                            <Image
+                                src="/model-forge-image.png"
+                                alt="ModelForge"
+                                width={160}
+                                height={36}
+                                className="h-9 w-auto object-contain"
+                            />
+                        </Link>
+                        <p className="text-xs text-gray-500">
+                            Build thoughtfully. Experiment confidently.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-medium text-gray-500">
+                        <Link
+                            href="#features"
+                            className="transition hover:text-green-800"
+                        >
+                            Features
+                        </Link>
+                        <Link
+                            href="#workflow"
+                            className="transition hover:text-green-800"
+                        >
+                            How it works
+                        </Link>
+                        <Link
+                            href="#why-modelforge"
+                            className="transition hover:text-green-800"
+                        >
+                            Why ModelForge
+                        </Link>
+                        <Show when="signed-out">
+                            <Link
+                                href="/sign-in"
+                                className="transition hover:text-green-800"
+                            >
+                                Sign in
+                            </Link>
+                        </Show>
+                        <Show when="signed-in">
+                            <Link
+                                href="/dashboard"
+                                className="transition hover:text-green-800"
+                            >
+                                Dashboard
+                            </Link>
+                        </Show>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                        © <CurrentYear /> ModelForge
+                    </p>
+                </div>
+            </footer>
+        </main>
     );
 }

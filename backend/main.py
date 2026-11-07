@@ -9,9 +9,13 @@ import pandas as pd
 from auth import require_auth
 from database import (
     delete_user_dataset,
+    delete_user_experiment,
     get_user_dataset,
     get_user_datasets,
+    get_user_experiment,
+    get_user_experiments,
     save_dataset,
+    save_experiment,
 )
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -630,6 +634,91 @@ async def delete_dataset(dataset_id: str, user_id: str = Depends(require_auth)):
     return {"message": "Dataset deleted successfully.", "dataset_id": dataset_id}
 
 
+@app.get("/api/experiments")
+async def list_experiments(
+    user_id: str = Depends(require_auth),
+):
+    experiments = get_user_experiments(user_id)
+
+    return {
+        "experiments": [
+            {
+                "experiment_id": experiment["_id"],
+                "dataset_id": experiment["dataset_id"],
+                "dataset_filename": experiment["dataset_filename"],
+                "task_type": experiment["task_type"],
+                "model": experiment["model"],
+                "target_column": experiment["target_column"],
+                "test_size": experiment["test_size"],
+                "random_state": experiment["random_state"],
+                "train_rows": experiment["train_rows"],
+                "test_rows": experiment["test_rows"],
+                "feature_count": experiment["feature_count"],
+                "metrics": experiment["metrics"],
+                "created_at": (
+                    experiment["created_at"].isoformat()
+                    if experiment.get("created_at")
+                    else None
+                ),
+            }
+            for experiment in experiments
+        ]
+    }
+
+
+@app.get("/api/experiments/{experiment_id}")
+async def get_experiment(
+    experiment_id: str,
+    user_id: str = Depends(require_auth),
+):
+    experiment = get_user_experiment(experiment_id, user_id)
+
+    if not experiment:
+        raise HTTPException(
+            status_code=404,
+            detail="Experiment not found.",
+        )
+
+    return {
+        "experiment_id": experiment["_id"],
+        "dataset_id": experiment["dataset_id"],
+        "dataset_filename": experiment["dataset_filename"],
+        "task_type": experiment["task_type"],
+        "model": experiment["model"],
+        "target_column": experiment["target_column"],
+        "test_size": experiment["test_size"],
+        "random_state": experiment["random_state"],
+        "train_rows": experiment["train_rows"],
+        "test_rows": experiment["test_rows"],
+        "feature_count": experiment["feature_count"],
+        "metrics": experiment["metrics"],
+        "created_at": (
+            experiment["created_at"].isoformat()
+            if experiment.get("created_at")
+            else None
+        ),
+    }
+
+
+@app.delete("/api/experiments/{experiment_id}")
+async def delete_experiment(
+    experiment_id: str,
+    user_id: str = Depends(require_auth),
+):
+    result = delete_user_experiment(experiment_id, user_id)
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Experiment not found.",
+        )
+
+    return {
+        "message": "Experiment deleted successfully.",
+        "experiment_id": experiment_id,
+    }
+
+
 @app.post("/api/models/train")
 async def train_model(
     dataset_id: str = Form(...),
@@ -662,7 +751,37 @@ async def train_model(
         test_size=test_size,
     )
 
+    experiment_id = str(uuid4())
+    created_at = datetime.now(UTC)
+
+    experiment = {
+        "_id": experiment_id,
+        "user_id": user_id,
+        "dataset_id": dataset_id,
+        "dataset_filename": dataset["filename"],
+        "task_type": result["task_type"],
+        "model": result["model"],
+        "target_column": result["target_column"],
+        "test_size": test_size,
+        "random_state": 42,
+        "train_rows": result["train_rows"],
+        "test_rows": result["test_rows"],
+        "feature_count": result["feature_count"],
+        "metrics": result["metrics"],
+        "created_at": created_at,
+    }
+
+    try:
+        save_experiment(experiment)
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Model trained, but unable to save experiment.",
+        ) from error
+
     return {
         "message": "Model trained successfully.",
+        "experiment_id": experiment_id,
+        "created_at": created_at.isoformat(),
         **result,
     }
