@@ -12,11 +12,18 @@ app.dependency_overrides[require_auth] = lambda: "test-user-id"
 
 @pytest.fixture(autouse=True)
 def mock_dataset_storage(monkeypatch):
-    monkeypatch.setattr("main.upload_file", lambda file_data, object_key: None)
-    monkeypatch.setattr("main.save_dataset", lambda dataset: dataset)
-    monkeypatch.setattr("main.delete_file", lambda object_key: None)
+    monkeypatch.setattr("routes.datasets.upload_file", lambda file_data, object_key: None)
+    monkeypatch.setattr("routes.datasets.save_dataset", lambda dataset: dataset)
+    monkeypatch.setattr("routes.datasets.delete_file", lambda object_key: None)
+    monkeypatch.setattr("routes.models.download_file", lambda storage_key: (
+        b"age,salary,purchased\n"
+        + b"".join(
+            f"{age},{30000 + (age - 20) * 1000},{age % 2}\n".encode()
+            for age in range(20, 40)
+        )
+    ))
     monkeypatch.setattr(
-        "main.get_user_dataset",
+        "routes.models.get_user_dataset",
         lambda dataset_id, user_id: {
             "_id": dataset_id,
             "user_id": user_id,
@@ -25,7 +32,16 @@ def mock_dataset_storage(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        "main.download_file",
+        "routes.datasets.get_user_dataset",
+        lambda dataset_id, user_id: {
+            "_id": dataset_id,
+            "user_id": user_id,
+            "filename": "customers.csv",
+            "storage_key": f"users/{user_id}/dataset/{dataset_id}.csv",
+        },
+    )
+    monkeypatch.setattr(
+        "routes.datasets.download_file",
         lambda storage_key: (
             b"age,salary,purchased\n"
             + b"".join(
@@ -440,7 +456,7 @@ def test_train_baseline_rejects_invalid_task():
 
 
 def test_train_endpoint_classification():
-    csv_content = "age,salary,purchased\n" + "".join(
+    "age,salary,purchased\n" + "".join(
         f"{age},{30000 + (age - 20) * 1000},{age % 2}\n" for age in range(20, 40)
     )
 
@@ -462,7 +478,7 @@ def test_train_endpoint_classification():
 
 
 def test_train_endpoint_rejects_missing_target():
-    csv_content = "age,purchased\n" + "".join(f"{age},{age % 2}\n" for age in range(20))
+    "age,purchased\n" + "".join(f"{age},{age % 2}\n" for age in range(20))
 
     response = client.post(
         "/api/models/train",
